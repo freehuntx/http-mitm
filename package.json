@@ -4,7 +4,7 @@
   "description": "This is a simple http proxy, for man in the middle purposes.",
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "https://github.com/freehuntx/http-mitm"
   },
   "files": [
     "index.js"
