@@ -1,6 +1,6 @@
 {
   "name": "http-mitm",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "This is a simple http proxy, for man in the middle purposes.",
   "repository": {
     "type": "git",

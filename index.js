@@ -18,7 +18,7 @@ class HttpMitm {
 
         if(self._onC2SCb !== undefined) {
           var data = {
-            path: URL.parse(request.url).path,
+            url: URL.parse(request.url),
             header: sendHeader,
             data: sendData
           };
@@ -52,7 +52,7 @@ class HttpMitm {
             if(self._onS2CCb !== undefined) {
               // Call the eventListener
               var data = {
-                path: URL.parse(request.url).path,
+                url: URL.parse(request.url),
                 header: recvHeader,
                 data: recvData
               };
