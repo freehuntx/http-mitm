@@ -1,82 +1,57 @@
-const URL = require('url');
-var http = require('http');
+var Http = require('http');
+var PacketSession = require('./lib/packetsession');
 
 class HttpMitm {
   constructor() {
-    var self = this;
-
-    this._server = http.createServer((request, response) => {
-      var session = {};
-      var sendChunks = [];
-
-      request.addListener('data', (chunk) => {
-        sendChunks.push(chunk);
-      });
-
-      request.addListener('end', () => {
-        var sendHeader = request.headers,
-          sendData = Buffer.concat(sendChunks);
-
-        if(self._onC2SCb !== undefined) {
-          var data = {
-            url: URL.parse(request.url),
-            header: sendHeader,
-            data: sendData
-          };
-
-          self._onC2SCb(session, data);
-
-          sendHeader = data.header;
-          sendData = data.data;
-          sendHeader['content-length'] = sendData.length;
-        }
-
-        var proxyReq = http.request({
-          hostname: sendHeader['host'],
-          post: 80,
-          method: request.method,
-          path: URL.parse(request.url).path,
-          headers: sendHeader
-        });
-
-        proxyReq.addListener('response', (proxyRes) => {
-          var recvChunks = [];
-
-          proxyRes.addListener('data', (chunk) => {
-            recvChunks.push(chunk);
-          });
-
-          proxyRes.addListener('end', () => {
-            var recvHeader = proxyRes.headers,
-                recvData = Buffer.concat(recvChunks);
-
-            if(self._onS2CCb !== undefined) {
-              // Call the eventListener
-              var data = {
-                url: URL.parse(request.url),
-                header: recvHeader,
-                data: recvData
-              };
-
-              self._onS2CCb(session, data);
-
-              recvHeader = data.header;
-              recvData = data.data;
-              recvHeader['content-length'] = recvData.length;
-            }
-
-            response.writeHead(proxyRes.statusCode, recvHeader);
-            response.end(recvData, 'binary');
-          });
-        });
-
-        proxyReq.end(sendData, 'binary');
-      });
-    });
+    this._server = Http.createServer(this._onClientConnected.bind(this));
   }
 
   listen(port) {
     this._server.listen(port);
+  }
+  
+  // Private
+  _onClientConnected(request, response) {
+    var self = this;
+    var packetSession = new PacketSession();
+    packetSession.request.setUrl(request.url);
+    packetSession.request.setMethod(request.method);
+    packetSession.request.setHeaders(request.headers);
+    
+    request.on('data', (chunk) => {
+      packetSession.request.pushBody(chunk);
+    });
+    
+    request.on('end', () => {
+      if (self._onC2SCb !== undefined)
+        self._onC2SCb(packetSession);
+        
+      var proxyRequest = Http.request({
+        hostname: packetSession.request.getUrl().hostname,
+        port: 80,
+        method: packetSession.request.getMethod(),
+        path: packetSession.request.getUrl().path,
+        headers: packetSession.request.getHeaders()
+      });
+      
+      proxyRequest.on('response', (proxyResponse) => {
+        packetSession.response.setHeaders(proxyResponse.headers);
+        
+        proxyResponse.on('data', (chunk) => {
+          packetSession.response.pushBody(chunk);
+        });
+        
+        proxyResponse.on('end', () => {
+          if (self._onS2CCb !== undefined)
+            self._onS2CCb(packetSession);
+            
+          response.writeHead(proxyResponse.statusCode, packetSession.response.getHeaders());
+          response.end(packetSession.response.getBody());
+        });
+      });
+      
+      proxyRequest.end(packetSession.request.getBody(), 'binary');
+    });
   }
 
   // Event setters
