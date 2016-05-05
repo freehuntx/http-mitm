@@ -6,6 +6,7 @@ class HttpMitm {
     var self = this;
 
     this._server = http.createServer((request, response) => {
+      var session = {};
       var sendChunks = [];
 
       request.addListener('data', (chunk) => {
@@ -23,7 +24,7 @@ class HttpMitm {
             data: sendData
           };
 
-          self._onC2SCb(data);
+          self._onC2SCb(session, data);
 
           sendHeader = data.header;
           sendData = data.data;
@@ -57,7 +58,7 @@ class HttpMitm {
                 data: recvData
               };
 
-              self._onS2CCb(data);
+              self._onS2CCb(session, data);
 
               recvHeader = data.header;
               recvData = data.data;
